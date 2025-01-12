@@ -1,4 +1,4 @@
-# test-operator
+# Test-Operator
 This is a test operator that automates testing of an OpenStack deployment
 running on an OpenShift cluster. The operator supports execution of the following
 tests:
@@ -11,6 +11,10 @@ tests:
 
 - Arbitrary tests written as an Ansible role (refer to **AnsibleTest CR**)
 
+# Test Operator Usage Video
+<p align="center">
+<a href="https://youtu.be/nz72z5goEP8"><img src="http://img.youtube.com/vi/nz72z5goEP8/0.jpg"></a>
+</p>
 
 ## Getting Started
 First, you will need an OpenStack Platform running on top of OpenShift. See:
