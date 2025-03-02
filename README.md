@@ -11,6 +11,17 @@ tests:
 
 - Arbitrary tests written as an Ansible role (refer to **AnsibleTest CR**)
 
+## My Contributions to the Test Operator Repository
+
+I have maintained the test-operator repository since October 2023 until December 2024.
+
+<details>
+  <summary>lpiwowar's contributions (statistics)</summary>
+   
+ ![Alt text](docs/test-operator-lpiwowar-statistics.png)
+</details>
+
+
 ## Test Operator Usage - YouTube video
 
 <p align="center">
