@@ -30,12 +30,11 @@ import (
 )
 
 const (
-	workflowNameSuffix       = "-workflow-counter"
-	podNameStepInfix         = "-workflow-step-"
-	envVarsConfigMapinfix    = "-env-vars-step-"
-	customDataConfigMapinfix = "-custom-data-step-"
+	podNameStepInfix         = "-s"
+	envVarsConfigMapinfix    = "-env-vars-s"
+	customDataConfigMapinfix = "-custom-data-s"
 	workflowStepNumInvalid   = -1
-	workflowStepNameInvalid  = "no-step-name"
+	workflowStepNameInvalid  = "no-name"
 	workflowStepLabel        = "workflowStep"
 	instanceNameLabel        = "instanceName"
 	operatorNameLabel        = "operator"
@@ -389,10 +388,6 @@ func (r *Reconciler) GetPodName(instance interface{}, workflowStepNum int) strin
 	return workflowStepNameInvalid
 }
 
-func (r *Reconciler) GetWorkflowConfigMapName(instance client.Object) string {
-	return instance.GetName() + workflowNameSuffix
-}
-
 func (r *Reconciler) GetPVCLogsName(instance client.Object, workflowStepNum int) string {
 	instanceName := instance.GetName()
 	instanceCreationTimestamp := instance.GetCreationTimestamp().Format(time.UnixDate)
@@ -611,44 +606,6 @@ func (r *Reconciler) setConfigOverwrite(customData map[string]string, configOver
 	}
 }
 
-func (r *Reconciler) OverwriteValueWithWorkflow(
-	instance v1beta1.TobikoSpec,
-	sectionName string,
-	workflowValueType string,
-	workflowStepNum int,
-) interface{} {
-	if len(instance.Workflow)-1 < workflowStepNum {
-		reflected := reflect.ValueOf(instance)
-		fieldValue := reflected.FieldByName(sectionName)
-		return fieldValue.Interface()
-	}
-
-	reflected := reflect.ValueOf(instance)
-	tobikoSpecValue := reflected.FieldByName(sectionName).Interface()
-
-	reflected = reflect.ValueOf(instance.Workflow[workflowStepNum])
-	tobikoWorkflowValue := reflected.FieldByName(sectionName).Interface()
-
-	if workflowValueType == "pbool" {
-		if val, ok := tobikoWorkflowValue.(*bool); ok && val != nil {
-			return *(tobikoWorkflowValue.(*bool))
-		}
-		return tobikoSpecValue.(bool)
-	} else if workflowValueType == "puint8" {
-		if val, ok := tobikoWorkflowValue.(*uint8); ok && val != nil {
-			return *(tobikoWorkflowValue.(*uint8))
-		}
-		return tobikoSpecValue
-	} else if workflowValueType == "string" {
-		if val, ok := tobikoWorkflowValue.(string); ok && val != "" {
-			return tobikoWorkflowValue
-		}
-		return tobikoSpecValue
-	}
-
-	return nil
-}
-
 func GetCommonRbacRules(privileged bool) []rbacv1.PolicyRule {
 	rbacPolicyRule := rbacv1.PolicyRule{
 		APIGroups:     []string{"security.openshift.io"},
@@ -733,4 +690,47 @@ func EnsureCloudsConfigMapExists(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func IsEmpty(value interface{}) bool {
+	if v, ok := value.(reflect.Value); ok {
+		switch v.Kind() {
+		case reflect.String, reflect.Map:
+			return v.Len() == 0
+		case reflect.Ptr, reflect.Interface, reflect.Slice:
+			return v.IsNil()
+		}
+	}
+	return false
+}
+
+// MergeSections iterates through all CR parameters and overrides them
+// with non-empty values from the workflow section of the current step.
+func MergeSections(main interface{}, workflow interface{}) {
+	mReflect := reflect.ValueOf(main).Elem()
+	wReflect := reflect.ValueOf(workflow)
+
+	for i := 0; i < mReflect.NumField(); i++ {
+		name := mReflect.Type().Field(i).Name
+		mValue := mReflect.Field(i)
+		wValue := wReflect.FieldByName(name)
+
+		if mValue.Kind() == reflect.Struct && wValue.Kind() != reflect.Ptr {
+			switch name {
+			case "CommonOptions":
+				wValue := wReflect.FieldByName("WorkflowCommonOptions")
+				MergeSections(mValue.Addr().Interface(), wValue.Interface())
+			case "TempestRun", "TempestconfRun":
+				MergeSections(mValue.Addr().Interface(), wValue.Interface())
+			}
+			continue
+		}
+
+		if wValue.IsValid() && !IsEmpty(wValue) {
+			if wValue.Kind() == reflect.Ptr && mValue.Kind() != reflect.Ptr {
+				wValue = wValue.Elem()
+			}
+			mValue.Set(wValue)
+		}
+	}
 }

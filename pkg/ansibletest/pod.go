@@ -20,14 +20,13 @@ func Pod(
 	workflowOverrideParams map[string]string,
 	externalWorkflowCounter int,
 	containerImage string,
-	privileged bool,
 ) *corev1.Pod {
 
 	runAsUser := int64(227)
 	runAsGroup := int64(227)
 
 	capabilities := []corev1.Capability{"NET_ADMIN", "NET_RAW"}
-	securityContext := util.GetSecurityContext(runAsUser, capabilities, privileged)
+	securityContext := util.GetSecurityContext(runAsUser, capabilities, instance.Spec.Privileged)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,7 +50,7 @@ func Pod(
 					Image:           containerImage,
 					Args:            []string{},
 					Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
-					VolumeMounts:    GetVolumeMounts(mountCerts, instance, externalWorkflowCounter),
+					VolumeMounts:    GetVolumeMounts(mountCerts, AnsibleTestPropagation, instance, externalWorkflowCounter),
 					SecurityContext: &securityContext,
 					Resources:       instance.Spec.Resources,
 				},
@@ -60,6 +59,7 @@ func Pod(
 				instance,
 				logsPVCName,
 				mountCerts,
+				AnsibleTestPropagation,
 				workflowOverrideParams,
 				externalWorkflowCounter,
 			),
